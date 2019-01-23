@@ -7,11 +7,15 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.request.target.SimpleTarget;
 import com.bumptech.glide.request.transition.Transition;
 import com.github.chrisbanes.photoview.OnPhotoTapListener;
@@ -50,10 +54,24 @@ public class ImageListAdapter extends RecyclerView.Adapter<ImageListAdapter.View
     public void onBindViewHolder(@NonNull final ViewHolder viewHolder, int position) {
         Glide.with(mContext)
                 .load(mImageUrls.get(position))
+                .apply(RequestOptions.diskCacheStrategyOf(DiskCacheStrategy.ALL))
+
                 .into(new SimpleTarget<Drawable>() {
                     @Override
                     public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                        viewHolder.mProgressBar.setVisibility(View.GONE);
                         viewHolder.mPhotoView.setImageDrawable(resource);
+                    }
+
+                    @Override
+                    public void onLoadFailed(@Nullable Drawable errorDrawable) {
+                        super.onLoadFailed(errorDrawable);
+                        viewHolder.mProgressBar.setVisibility(View.GONE);
+                    }
+
+                    @Override
+                    public void onStart() {
+                        super.onStart();
                     }
                 });
     }
@@ -72,14 +90,15 @@ public class ImageListAdapter extends RecyclerView.Adapter<ImageListAdapter.View
         public PhotoView mPhotoView;
         public FrameLayout mRootLayout;
         private Drawable activityBackgroundDrawable;
+        private ProgressBar mProgressBar;
 
         public ViewHolder(@NonNull ViewGroup parent) {
-            super(mInflater.inflate(R.layout.activity_image, parent,
+            super(mInflater.inflate(R.layout.item_image, parent,
                     false));
             mDropDismissLayout = itemView.findViewById(R.id.drop_dismiss_layout);
             mPhotoView = itemView.findViewById(R.id.photo_view);
             mRootLayout = itemView.findViewById(R.id.root_layout);
-
+            mProgressBar = itemView.findViewById(R.id.progress_bar);
             initLayout();
         }
 
@@ -87,7 +106,7 @@ public class ImageListAdapter extends RecyclerView.Adapter<ImageListAdapter.View
             mPhotoView.setOnPhotoTapListener(new OnPhotoTapListener() {
                 @Override
                 public void onPhotoTap(ImageView view, float x, float y) {
-                    finishInMillis(0);
+//                    finishInMillis(0);
                 }
             });
             activityBackgroundDrawable = mRootLayout.getBackground().mutate();
@@ -125,9 +144,11 @@ public class ImageListAdapter extends RecyclerView.Adapter<ImageListAdapter.View
 
                 @Override
                 public InterceptResult gestureInterceptor(float scrollY) {
+                    boolean isScrollingUpwards = scrollY < 0;
+                    int directionInt = isScrollingUpwards ? -1 : 1;
+                    boolean canPanFurther = mPhotoView.canScrollVertically(directionInt);
                     //只有在原尺寸大小下才能拖拽
-                    boolean canPanFurther = !mPhotoView.isZoomable();
-                    if (canPanFurther) {
+                    if (mPhotoView.getScale() != 1.0f) {
                         return InterceptResult.INTERCEPTED;
                     } else {
                         return InterceptResult.IGNORED;
